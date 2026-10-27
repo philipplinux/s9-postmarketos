@@ -1,0 +1,64 @@
+# Archived: unmaintained
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer=""
+pkgname=device-samsung-crownlte
+pkgdesc="Samsung Galaxy Note 9"
+pkgver=5
+pkgrel=0
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	linux-samsung-crownlte
+	mkbootimg
+	postmarketos-base
+	postmarketos-base-downstream
+	msm-fb-refresher
+"
+makedepends="devicepkg-dev"
+source="
+	deviceinfo
+	initfs-hook.sh
+	hciattach
+"
+subpackages="
+	$pkgname-nonfree-firmware:nonfree_firmware
+	$pkgname-nonfree-firmware-openrc:nonfree_firmware_openrc
+	$pkgname-x11
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+
+	install -Dm755 "$srcdir"/hciattach \
+		-t "$pkgdir"/etc/init.d
+}
+
+nonfree_firmware() {
+	pkgdesc="$pkgdesc (WiFi and BT firmware)"
+	depends="firmware-samsung-crownlte bluez-deprecated"
+
+	mkdir "$subpkgdir"
+}
+
+nonfree_firmware_openrc() {
+	default_openrc
+	install_if="$pkgname-nonfree-firmware openrc"
+}
+
+x11() {
+	install_if="$pkgname=$pkgver-r$pkgrel xorg-server"
+	depends="xf86-input-evdev"
+	mkdir "$subpkgdir"
+}
+
+sha512sums="
+2e97d62039da699c11aa136e01feb55ebce4053190ea9740b85ca38ab9a446ddaf47810ed4e5f255125f2b4342203fe2afa182c99b06be5f5f11155dc2137a12  deviceinfo
+0ae5aec6e6eb3cfdd7fabfa07fc1d0aef9487e5fcbe657e41c0c0c2796d70466f287775fbe96647b632ad1fc6ef58736b6cc3cb95cc0995ff10acd1efa9eda6b  initfs-hook.sh
+524b25c7fb5d2da9a7090d0d8bf776c00d9f3d6899d2096cd6b7d5f0618a60ff22262ce710c88f71cbacf68749e2c6c6b5e12c87e63730106e689c644b3d5a81  hciattach
+"

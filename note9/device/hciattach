@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+# BCM4347B2 (Samsung ships bcm4361B2_semco.hcd) on ttySAC1.
+# Needs a fresh rfkill power cycle before attach, else init times out.
+# The patch is looked up in /lib/firmware/BCM4347B2.hcd (symlink from s9-server).
+description="Attach Broadcom Bluetooth on ttySAC1"
+command=/usr/bin/hciattach
+command_args="-t 30 /dev/ttySAC1 bcm43xx 3000000 flow nosleep"
+depend() { after udev; before bluetooth; }
+start_pre() {
+	# BT address = Wi-Fi MAC + 1 (the stock layout); without it the chip uses a shared default.
+	for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e /sys/class/net/wlan0/address ] && break; sleep 1; done
+	# dhd reports a placeholder 00:90:4c:.. until wlan0 is up (firmware loaded).
+	ip link set wlan0 up 2>/dev/null
+	for _ in 1 2 3 4 5; do mac=$(cat /sys/class/net/wlan0/address 2>/dev/null); case $mac in 00:90:4c:*) sleep 1;; *) break;; esac; done
+	case $mac in 00:90:4c:*) mac=;; esac
+	if [ -n "$mac" ]; then
+		last=$(printf '%02x' $(( (0x${mac##*:} + 1) & 255 )))
+		command_args="$command_args ${mac%:*}:$last"
+	fi
+	rfkill block bluetooth; sleep 1; rfkill unblock bluetooth; sleep 2
+}
+start_post() { sleep 1; hciconfig hci0 up; }

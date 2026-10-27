@@ -1,0 +1,101 @@
+# Archived: unmaintained
+# Reference: <https://postmarketos.org/vendorkernel>
+# Kernel config based on: arch/arm64/configs/exynos9810-crownlte_defconfig
+
+maintainer=""
+pkgname=linux-samsung-crownlte
+pkgver=4.9.299
+pkgrel=10
+pkgdesc="Samsung Galaxy Note 9 kernel fork"
+arch="aarch64"
+_carch="arm64"
+_flavor="samsung-crownlte"
+url="https://kernel.org"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps pmb:cross-native"
+makedepends="
+	bash
+	bc
+	bison
+	devicepkg-dev
+	dtbtool-exynos
+	findutils
+	flex
+	openssl-dev
+	perl
+	clang
+"
+
+CC="clang"
+HOSTCC="clang"
+
+# Source
+_repository="android_kernel_samsung_universal9810"
+_commit="5eaa43c40667ef407f826ca2bab9552568327c23"
+_config="config-$_flavor.$arch"
+source="
+	$pkgname-$_commit.tar.gz::https://github.com/Exynos9810-LTS/$_repository/archive/$_commit.tar.gz
+	$_config
+	01-decon_reg.patch
+	02-decon_dsi-BGRA-to-RGBA.patch
+	03-decon_dsi-UNBLANK-missed.patch
+	04-wifi-firmware-path.patch
+	05-decon_core-disable-decon_release.patch
+	06-fix-read-only-segment-has-dynamic-relocations-error.patch
+	07-i2c-preserve-irq-affinity.patch
+	08-devfreq-start-worker.patch
+	09-dhd-boot-runtime-policy.patch
+	10-mfc-detect-transition.patch
+	11-hpgov-idle-wait.patch
+	12-store-hold.patch
+	13-acpm-ipc-recheck.patch
+	14-hpgov-quad-freq.patch
+	15-decon-fbcon-blit.patch
+	16-sec_ts-abs-mt-custom-range.patch
+"
+builddir="$srcdir/$_repository-$_commit"
+_outdir="out"
+
+prepare() {
+	default_prepare
+	. downstreamkernel_prepare
+}
+
+build() {
+	unset LDFLAGS
+	make O="$_outdir" ARCH="$_carch" CC="${CC:-gcc}" \
+		CLANG_TRIPLE="$CROSS_COMPILE" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-postmarketOS"
+
+	# Master DTB (deviceinfo_bootimg_qcdt)
+	dtbTool-exynos -o "$_outdir/arch/$_carch/boot"/dt.img \
+		$(find "$_outdir/arch/$_carch/boot/dts/" -name *crownlte*.dtb)
+}
+
+package() {
+	downstreamkernel_package "$builddir" "$pkgdir" "$_carch" \
+		"$_flavor" "$_outdir"
+	install -Dm644 "$_outdir/arch/$_carch/boot"/dt.img \
+		"$pkgdir"/boot/dt.img
+}
+
+sha512sums="
+2825193c94868c2e301e773e5cc5eef0e4fb4030a7e02a14e4ccfcab491af884e27ffabe92aabbbf77c0e74764e190ee800b9cdd5ff495f28666bfc9754888f2  linux-samsung-crownlte-5eaa43c40667ef407f826ca2bab9552568327c23.tar.gz
+9b8216d2d193670faa1f3bcf5bde6ff50be7beafd12bceed106a189bc8a645f66db9b2d4c4ac7da4b23ea197a8fb2c3621990b616510fbec5d1d3c055f7205d1  config-samsung-crownlte.aarch64
+8d56a239cbd488692249ba856f3e949863dbb60edacfc862171f7b42c2564e99009ba88c8299b2179f468291fdc0de118235307acad07ec88342b8e68ee6f075  01-decon_reg.patch
+65f5b1541bf3d4dab9db3d5de2aa888e794772f66d85541d11fbf515e7ec9188cda2ec46411f5469d8485caa5f405ffa16159f556bd9180c0cd3a527b14f9f5f  02-decon_dsi-BGRA-to-RGBA.patch
+24eb8701d77ad6cfc98a153341874d753a67930a369b1a08d8d51682a5d1014971e106bda93b7180bcacdf7032bb952fdca02f68886ea27c761eab8fefdb03fa  03-decon_dsi-UNBLANK-missed.patch
+596235334147a430d0104d01647e57aeac71b7a9e484daf4ad8fca9cd1cf23e040fbf2c00dea7fb2a096e741eb1dde71471585a59d71d47dcdb1336e5c16efad  04-wifi-firmware-path.patch
+3bae3abd47766eba42ebe1ca758f0d9e1f8a926132d98705985b493fb99115af863700cc76cfaf3a8b812fcae86b52b7c6807dc8fbade95f98c1e965c5e3dddc  05-decon_core-disable-decon_release.patch
+b24594b1bb1d5629338312236957e93f92422289a43f4865763e427f50b0e6a1ca0a7cd12cbdeb81135705b8d76d165b3b8f1b4ac6cb4c5b8d68ed3275ec299d  06-fix-read-only-segment-has-dynamic-relocations-error.patch
+ce31969271e27d23bfca19fd0d20783378e70fecde2ca7174a96f1c006a24c7aceb332dd7829af519eed6bebb2b28810d32fa9b748faa30b0afa8637b2ab3d1a  07-i2c-preserve-irq-affinity.patch
+a4ca08e921d7974331288953be7ec9afb399e234590c3a2950d5e50b31f711f17b69a6a1f45806603e922d114758c3fb3725b4f3d2e826866a2f299ecf577d7c  08-devfreq-start-worker.patch
+6069ee80efbda2dc2cdb076c237581419af867b9c7904bd86a5e81b1540a28709796b28033f70b671eeb5bae17ccf0e4cd8ec7a635dee0754667022475791888  09-dhd-boot-runtime-policy.patch
+10a44abcc51134f701540850ab982efbf3f6694ee41f3f21b1179b43e706ac36c5fcb6a6ea27be7d47095f42b4d8da068877cc745a3d041974a4b2f6570821a3  10-mfc-detect-transition.patch
+1173ddad83c37517ba15ec1b37770666f25f2d2f3753fd838781694ac0dcfc8af0490bd408fae0be89f9fb9df5386c75c4294fb7e330ed1c5cfbb027e6ad2e3a  11-hpgov-idle-wait.patch
+9208dbceb46389448ff29bb29c1131020afe07ac304b746bde5eafe20411bb3bceb51c2169fc1b34f912772e1079f16b9da7da5f0fc8e89481e3e7b940fc3f7d  12-store-hold.patch
+60f5b23b6d8c099558741b44032698740a999ae5799f6c2f8c09ac741e3007e5e20bab1a8149263b74f418cec11db2dd279de620ac9ab08f6f20174c110c9d75  13-acpm-ipc-recheck.patch
+802777bb49031727f124a022aff01293f810f1f6553d8ad39a767dcaf72dbb4e6c18849a0978a73a6c16d2b6b4eb65d16f108832339e9c911c796e3f604c0682  14-hpgov-quad-freq.patch
+956c04e574ca77c93fd11c6341dbc819ed644ae0d1ddd3cb3531bc1e45301c9a6362f18f89e5b9a9eab0b2a15143b478ff6c0c332243f5cfacddc2a7857240f1  15-decon-fbcon-blit.patch
+10d932a0ef7bdc33834cb49bfed2ba9ea69f3ecc0811f30c6398d17ac075eaaf7f7a1e35231de6fae12b26998167b418d0743164e4acd00872bae8260fc2f7ec  16-sec_ts-abs-mt-custom-range.patch
+"
