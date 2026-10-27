@@ -123,7 +123,7 @@ export function initS9(supported) {
   picker.replaceChildren(...Object.entries(models).map(([key, model]) => new Option(model.label, key, false, key === s9.device)));
   picker.addEventListener('change', () => { location.search = `?model=${picker.value}`; });
   const names = { twrp: s9.twrp.name, model: s9.model, device: `samsung-${s9.device}`,
-    root: s9.images[0].name, part: s9.images[1].name, title: s9.device === 'star2lte' ? 'Galaxy S9+.' : 'Galaxy S9.' };
+    root: s9.images[0].name, part: s9.images[1].name, title: { star2lte: 'Galaxy S9+.', crownlte: 'Galaxy Note9.' }[s9.device] ?? 'Galaxy S9.' };
   const labelled = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-name]'));
   for (const node of labelled) node.textContent = names[node.dataset.name] ?? node.textContent;
 

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0a1114">
     <link rel="icon" href="data:,">
-    <meta name="description" content="Experimental local browser flasher for the Samsung Galaxy S9 and S9+ (Exynos) postmarketOS server image.">
-    <title>Galaxy S9 / S9+ USB Flasher</title>
+    <meta name="description" content="Experimental local browser flasher for the Samsung Galaxy S9, S9+ and Note9 (Exynos) postmarketOS server image.">
+    <title>Galaxy S9 / S9+ / Note9 USB Flasher</title>
     <link rel="stylesheet" href="./style.css">
     <script type="module" src="./app.js"></script>
   </head>
@@ -27,8 +27,8 @@
           <h1 id="page-title">Flash your <span data-name="title">Galaxy S9.</span></h1>
           <label class="field-label" for="model">Phone model</label>
           <select class="confirmation-input" id="model"></select>
-          <p class="intro-copy"><span data-name="model">Samsung Galaxy S9 SM-G960F (Exynos)</span>, <code data-name="device">samsung-starlte</code>, only. The S9+ build is untested on real hardware. Choose the files from your build and send them over USB. Everything runs in this browser; nothing is uploaded.</p>
-          <p class="experimental-note"><strong>Experimental:</strong> only continue if you understand the recovery path for your device. Not for Snapdragon models (SM-G9600, SM-G9650). Stuck in a bootloop or softbrick? Download Mode still works: <a href="https://samfw.com/" target="_blank" rel="noopener noreferrer">SamFW</a> gets you the stock firmware (and an Odin-style flash tool) to go back to Android.</p>
+          <p class="intro-copy"><span data-name="model">Samsung Galaxy S9 SM-G960F (Exynos)</span>, <code data-name="device">samsung-starlte</code>, only. The S9+ and Note9 builds are untested on real hardware. Choose the files from your build and send them over USB. Everything runs in this browser; nothing is uploaded.</p>
+          <p class="experimental-note"><strong>Experimental:</strong> only continue if you understand the recovery path for your device. Not for Snapdragon models (SM-G9600, SM-G9650, SM-N960U/W, SM-N9600). Stuck in a bootloop or softbrick? Download Mode still works: <a href="https://samfw.com/" target="_blank" rel="noopener noreferrer">SamFW</a> gets you the stock firmware (and an Odin-style flash tool) to go back to Android.</p>
         </section>
 
         <div class="s9-panel" id="s9-panel">
@@ -37,7 +37,7 @@
               <div><p class="eyebrow">SECTION 1 · SKIP IF YOU ALREADY HAVE TWRP</p><h2 id="twrp-title">Install TWRP</h2></div>
               <span class="version-chip">S9 / DOWNLOAD MODE</span>
             </div>
-            <p class="field-help">Writes only the <code>RECOVERY</code> partition (Odin protocol). Needs an OEM-unlocked Exynos phone of the model picked above. Not for Snapdragon models (SM-G9600, SM-G9650).</p>
+            <p class="field-help">Writes only the <code>RECOVERY</code> partition (Odin protocol). Needs an OEM-unlocked Exynos phone of the model picked above. Not for Snapdragon models (SM-G9600, SM-G9650, SM-N960U/W, SM-N9600).</p>
             <ol class="guide-list s9-steps">
               <li><span>01</span><p>Power off. Hold <kbd>Volume Down</kbd> + <kbd>Bixby</kbd>, plug in USB, press <kbd>Volume Up</kbd> to enter Download Mode.</p></li>
               <li><span>02</span><p>Connect first: it tells you right away if the phone is busy. Then download <code data-name="twrp">twrp-3.7.0_9-0-starlte.img</code> (or pick your own copy). The page checks its SHA-256 before writing.</p></li>

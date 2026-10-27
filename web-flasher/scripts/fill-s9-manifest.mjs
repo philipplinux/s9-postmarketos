@@ -1,4 +1,4 @@
-// Usage: node scripts/fill-s9-manifest.mjs <out-dir> <model> [release]   (model: starlte | star2lte)
+// Usage: node scripts/fill-s9-manifest.mjs <out-dir> <model> [release]   (model: starlte | star2lte | crownlte)
 // Fills size + sha256 of that model's images in site/s9-manifest.js from files in <out-dir>
 // (hashes the files itself, so no SHA256 file format assumptions; compare with it by eye).
 import { createHash } from 'node:crypto';

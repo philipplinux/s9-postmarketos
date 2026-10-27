@@ -1,4 +1,4 @@
-// Galaxy S9 (SM-G960F, starlte) and S9+ (SM-G965F, star2lte), Exynos. One pin block per model: fill it with
+// Galaxy S9 (SM-G960F, starlte), S9+ (SM-G965F, star2lte) and Note9 (SM-N960F/N, crownlte), Exynos. One pin block per model: fill it with
 // `node scripts/fill-s9-manifest.mjs <out-dir> <model> [release]` once the image build exists.
 // Entries with size 0 or an empty sha256 make Section 2 refuse to run (fail closed).
 export const models = {
@@ -48,6 +48,29 @@ export const models = {
       { name: 'samsung-star2lte-root.img', partition: 'SYSTEM', size: 1319108608, sha256: 'efbf3b0710bd9eab12bcc8336fcf9918df8cc17926bcb570443e5d6320ff65ce' },
       { name: 'samsung-star2lte-boot.img', partition: 'VENDOR', size: 536870912, sha256: 'a9e77d80928f69b21fa97719a5031050a712e796bb31f8276fed30b53a8638b0' },
       { name: 'boot.img', partition: 'BOOT', size: 38756352, sha256: 'e5d45313ef8ceb966c7175cdcaddcb1e9ff40057db4c29ce3d9c98890bceda0f' }
+    ],
+    userdata: { partition: 'USERDATA', label: 's9-srv' }
+  },
+  // Untested on hardware: S9 build with the crownlte kernel config/DTB and TWRP; same SoC, so same UFS by-name path.
+  crownlte: {
+    label: 'Galaxy Note9 · SM-N960F/N (untested)',
+    device: 'crownlte',
+    model: 'Samsung Galaxy Note9 SM-N960F/N (Exynos)',
+    twrp: {
+      name: 'twrp-3.7.0_9-0-crownlte.img',
+      partition: 'RECOVERY',
+      size: 42801152,
+      sha256: '7ea8960e5c8df86f07c6d6b3f5b4ab6fa1c533cafd46cd4e2578d32867f154af'
+    },
+    release: 'v2026.10.27-note9',
+    // Shown under the build number in Section 2; update with each release.
+    changes: 'First Note9 build: S9 image with the Note9 kernel (touch, S Pen), all Wi-Fi modules and USB networking. No speaker audio.',
+    mirror: 'https://huggingface.co/PhilippLinux/s9-postmarketos/resolve/main/',
+    byName: '/dev/block/platform/11120000.ufs/by-name',
+    images: [
+      { name: 'samsung-crownlte-root.img', partition: 'SYSTEM', size: 1321205760, sha256: 'c0153a2970a5f10f98ec73b4c0a89407148f896e7ff8ae103b862a60e435e2c8' },
+      { name: 'samsung-crownlte-boot.img', partition: 'VENDOR', size: 536870912, sha256: '210c0d0a571b54ee5f9c485d4179b7d9c46b6e6fc4e3cee830e4956243fd2e3a' },
+      { name: 'boot.img', partition: 'BOOT', size: 39299072, sha256: 'dc574b0576d6b47c930e22cf519834c60e4c9a829245a553f69adc867c33b7e2' }
     ],
     userdata: { partition: 'USERDATA', label: 's9-srv' }
   }
