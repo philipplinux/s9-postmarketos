@@ -50,7 +50,7 @@ Tested on one SM-G960F: a fresh install of the release image via the web flasher
 ## Galaxy S9+ (SM-G965F, `star2lte`)
 
 Same image built for the S9+: pick **Galaxy S9+** at the top of the web flasher, or use the `-s9plus` release.
-**Untested on hardware**, and no speaker audio (the S9 DSP tuning is not shipped for the S9+). Recipes and
+**Tested working** on an S9+ (owner, 2026-10-27), but no speaker audio (the S9 DSP tuning is not shipped for the S9+). Recipes and
 build steps: [s9plus/README.md](s9plus/README.md).
 
 ## Web flasher

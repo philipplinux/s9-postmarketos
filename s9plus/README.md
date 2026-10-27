@@ -1,6 +1,6 @@
 # Galaxy S9+ (SM-G965F, `star2lte`)
 
-**Untested on hardware.** Same image as the S9: same kernel source, all 15 patches, same `s9-server`.
+**Tested working on an S9+** (owner, 2026-10-27). Same image as the S9: same kernel source, all 15 patches, same `s9-server`.
 
 - `kernel/`: `linux-samsung-star2lte`, the S9 recipe with the S9+ defconfig camera options (`CAMERA_STAR2`,
   `CIS_3M3_OBJ`, `OIS_USE_RUMBA_S6`) and the `*star2lte*.dtb`. Patches link to `../../kernel/`.

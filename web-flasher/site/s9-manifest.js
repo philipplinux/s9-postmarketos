@@ -28,9 +28,9 @@ export const models = {
     ],
     userdata: { partition: 'USERDATA', label: 's9-srv' }
   },
-  // Untested on hardware: same build as the S9 with the star2lte kernel config/DTB and TWRP.
+  // Owner-tested on an S9+ (2026-10-27): same build as the S9 with the star2lte kernel config/DTB and TWRP.
   star2lte: {
-    label: 'Galaxy S9+ · SM-G965F (untested)',
+    label: 'Galaxy S9+ · SM-G965F',
     device: 'star2lte',
     model: 'Samsung Galaxy S9+ SM-G965F (Exynos)',
     twrp: {
