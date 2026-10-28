@@ -1,0 +1,143 @@
+#!/usr/bin/python3 -I
+"""Root-owned single-profile WireGuard control; only public status crosses sudo."""
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+
+CONF = Path('/etc/s9/wireguard')
+RUNLEVEL = Path('/etc/runlevels/default')
+ACTIONS = ('start', 'stop', 'autostart-on', 'autostart-off')
+
+
+def parse_config(text):
+    values = {'PROFILE': 'wg0'}
+    seen = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        key, sep, value = line.partition('=')
+        if not sep or key not in ('PROFILE', 'SERVICE') or key in seen:
+            raise ValueError('Invalid WireGuard settings')
+        pattern = r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}' if key == 'PROFILE' else r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}'
+        if not re.fullmatch(pattern, value) or value in ('.', '..'):
+            raise ValueError('Invalid WireGuard settings')
+        values[key] = value
+        seen.add(key)
+    return values['PROFILE'], values.get('SERVICE', 'wg-quick.' + values['PROFILE'])
+
+
+def trusted(path, regular=False):
+    """Reject symlinks, non-root ownership and writable configuration ancestors."""
+    path = Path(path)
+    for node in (path, *path.parents):
+        info = node.lstat()
+        if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError('Untrusted WireGuard configuration')
+        if node == path and regular and not stat.S_ISREG(info.st_mode):
+            raise ValueError('Invalid WireGuard configuration file')
+
+
+def settings(conf=CONF):
+    trusted(conf, regular=True)
+    profile, service = parse_config(Path(conf).read_text())
+    # Only metadata: never open the profile, which contains the private key.
+    trusted(Path('/etc/wireguard') / (profile + '.conf'), regular=True)
+    service_path = Path('/etc/init.d') / service
+    # OpenRC named instances commonly link wg-quick.wg0 to wg-quick.
+    trusted(service_path.parent)
+    if service_path.lstat().st_uid != 0:
+        raise ValueError('Untrusted WireGuard service')
+    trusted(service_path.resolve(strict=True), regular=True)
+    return profile, service
+
+
+def execute(cmd, run, timeout=2):
+    return run(cmd, capture_output=True, text=True, timeout=timeout,
+               env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C'})
+
+
+def runlevel_enabled(service):
+    """Read only a trusted OpenRC link for the configured service."""
+    trusted(RUNLEVEL)
+    link = RUNLEVEL / service
+    try:
+        info = link.lstat()
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISLNK(info.st_mode) or info.st_uid != 0:
+        raise ValueError('Untrusted WireGuard runlevel entry')
+    target = link.resolve(strict=True)
+    expected = (Path('/etc/init.d') / service).resolve(strict=True)
+    if target != expected:
+        raise ValueError('Unexpected WireGuard runlevel target')
+    trusted(target, regular=True)
+    return True
+
+
+def status(conf=CONF, run=subprocess.run):
+    result = {'state': 'Unconfigured', 'up': None, 'configured': False,
+              'profile': None, 'service': None, 'autostart': None, 'peers': None,
+              'latest_handshake': None}
+    try:
+        profile, service = settings(conf)
+    except (OSError, ValueError):
+        return result
+    result.update(configured=True, profile=profile, service=service, state='Unknown')
+    try:
+        link = execute(['/sbin/ip', '-j', 'link', 'show', 'dev', profile], run)
+        if link.returncode == 0:
+            links = json.loads(link.stdout)
+            result['up'] = bool(links and 'UP' in links[0].get('flags', []))
+        elif link.returncode == 1:  # iproute2: interface absent
+            result['up'] = False
+        result['state'] = 'Up' if result['up'] else 'Down' if result['up'] is False else 'Unknown'
+        result['autostart'] = runlevel_enabled(service)
+        if result['up']:
+            peers = execute(['/usr/bin/wg', 'show', profile, 'latest-handshakes'], run)
+            if peers.returncode == 0:
+                stamps = [int(line.split()[1]) for line in peers.stdout.splitlines() if len(line.split()) == 2]
+                result.update(peers=len(stamps), latest_handshake=max(stamps, default=0) or None)
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, TypeError):
+        pass
+    return result
+
+
+def control(action, conf=CONF, run=subprocess.run):
+    if action not in ACTIONS:
+        return {'ok': False, 'message': 'Unsupported action'}
+    try:
+        profile, service = settings(conf)
+        if action.startswith('autostart-'):
+            wanted = action == 'autostart-on'
+            if runlevel_enabled(service) == wanted:
+                return {'ok': True, 'message': 'Saved'}
+        command = ['/sbin/rc-service', service, action] if action in ('start', 'stop') else [
+            '/sbin/rc-update', 'add' if action == 'autostart-on' else 'del', service, 'default']
+        result = execute(command, run, timeout=15)
+        ok = result.returncode == 0
+        if ok and action.startswith('autostart-'):
+            ok = runlevel_enabled(service) == wanted
+        return {'ok': ok, 'message': 'Saved' if ok else 'WireGuard service action failed'}
+    except (OSError, ValueError):
+        return {'ok': False, 'message': 'WireGuard is not configured'}
+    except subprocess.SubprocessError:
+        return {'ok': False, 'message': 'WireGuard service action timed out'}
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in ('status', *ACTIONS):
+        return 2
+    if os.geteuid() != 0:
+        return 1
+    result = status() if sys.argv[1] == 'status' else control(sys.argv[1])
+    print(json.dumps(result))
+    return 0 if sys.argv[1] == 'status' or result['ok'] else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

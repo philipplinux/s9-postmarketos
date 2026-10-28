@@ -1,7 +1,7 @@
 maintainer="S9 <s9@example.org>"
 pkgname=s9-server
 pkgver=1
-pkgrel=1
+pkgrel=2
 pkgdesc="Headless-server setup for the Samsung Galaxy S9 (dashboard, touch UI, web terminal, Docker, firewall)"
 url="https://postmarketos.org"
 arch="aarch64"
@@ -35,15 +35,20 @@ depends="
 	iptables
 	iptables-legacy
 	iw
+	iproute2
 	pam-rundir
 	py3-pillow
 	py3-pyte
 	python3
 	starship
+	sudo-virt
 	tailscale
 	tailscale-openrc
 	tmux
 	ttyd
+	wireguard-tools
+	wireguard-tools-openrc
+	wireguard-go
 	wpa_supplicant
 "
 options="!check !fhs"

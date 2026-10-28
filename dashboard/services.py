@@ -38,7 +38,7 @@ def services_info(run=subprocess.run, sys_root='/sys'):
     cache_key = (str(sys_root), run)
     if _cached is not None and _cached_key == cache_key and time.monotonic() - _cached_at < 1:
         return _cached
-    result = {'ssh': {'up': None}, 'tailscale': {'up': None}, 'usb': _usb_info(sys_root), 'bluetooth': {'up': None, 'address': None}}
+    result = {'ssh': {'up': None}, 'tailscale': {'up': None}, 'wireguard': {'up': None}, 'usb': _usb_info(sys_root), 'bluetooth': {'up': None, 'address': None}}
     try:
         show = run(['bluetoothctl', 'show'], capture_output=True, text=True, timeout=2)
         if show.returncode == 0 and 'Powered:' in show.stdout:
@@ -61,6 +61,15 @@ def services_info(run=subprocess.run, sys_root='/sys'):
                                    'name': (st.get('Self') or {}).get('HostName'),
                                    'peers': len(peers), 'online': sum(1 for q in peers.values() if q.get('Online'))}
     except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        pass
+    try:
+        out = run(['sudo', '-n', '/usr/local/sbin/s9-wireguard', 'status'], capture_output=True, text=True, timeout=7)
+        if out.returncode == 0:
+            wg = json.loads(out.stdout)
+            if isinstance(wg, dict):
+                result['wireguard'] = {key: wg.get(key) for key in (
+                    'up', 'state', 'configured', 'profile', 'service', 'autostart', 'peers', 'latest_handshake')}
+    except (OSError, subprocess.SubprocessError, ValueError):
         pass
     _cached, _cached_at, _cached_key = result, time.monotonic(), cache_key
     return result

@@ -1,0 +1,6 @@
+# Copy to /etc/s9/wireguard as root, mode 0600, after provisioning the VPN.
+# Values are literal names, without quotes, spaces, or shell expansions.
+PROFILE=wg0
+# Optional: omit SERVICE to use wg-quick.wg0. An existing root-owned OpenRC
+# service may wrap WireGuard with DNS, routing or userspace implementation setup.
+# SERVICE=my-vpn

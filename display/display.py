@@ -99,9 +99,36 @@ PERF_GROUPS = {'Little': ('Little cores · cpu0-3', CYAN), 'Big': ('Big cores ·
 OV_STORE, BACK_BTN = (30, 860, 525, 1160), (30, 25, 260, 125)
 FILES_BTN, FILE_TOP, FILE_ROW, FILE_LINE, FILES_MAX, FILE_PEEK = (880, 25, 1040, 125), 190, 100, 36, 500, 65536   # Partitions -> read-only folder explorer
 OV_BATT, OV_CPU, OV_NET, OV_DOCK, OV_PROC = (30, 160, 1050, 500), (30, 530, 525, 830), (30, 1190, 1050, 1560), (30, 1590, 1050, 1700), (30, 1720, 1050, 2040)
-NET_ROWS = (('ssh', 'SSH & User'), ('tailscale', 'Tailscale'), ('usb', 'USB'), ('bluetooth', 'Bluetooth'), ('web', 'Web dashboard'), ('audio', 'Audio'))
-NET_ICONS = {'ssh': '\U000F08C0', 'tailscale': '\U000F0582', 'usb': '\U000F0553', 'bluetooth': '\U000F00AF', 'web': '\U000F059F', 'audio': '\U000F057E'}
+NET_ROWS = (('ssh', 'SSH & User'), ('tailscale', 'Tailscale'), ('wireguard', 'WireGuard'), ('usb', 'USB'), ('bluetooth', 'Bluetooth'), ('web', 'Web dashboard'), ('audio', 'Audio'))
+NET_ICONS = {'ssh': '\U000F08C0', 'tailscale': '\U000F0582', 'wireguard': '\U000F0565', 'usb': '\U000F0553', 'bluetooth': '\U000F00AF', 'web': '\U000F059F', 'audio': '\U000F057E'}
 NET_WIFI = (30, 170, 1050, 690)
+WG_START, WG_STOP, WG_AUTO = (30, 940, 525, 1080), (555, 940, 1050, 1080), (30, 1110, 1050, 1250)
+WG_HELPER = '/usr/local/sbin/s9-wireguard'
+
+
+def ov_service_box(i):
+    # Five mini-cards occupy the same 960 px interior as the original four.
+    x = 60 + i * 194
+    return (x, 1430, x + 184, 1530)
+
+
+def wg_state(wg):
+    if wg.get('configured') is False:
+        return 'Unconfigured', None
+    up = wg.get('up')
+    return ('Up' if up is True else 'Down' if up is False else 'Unknown'), up
+
+
+def wg_action(action):
+    if action not in ('start', 'stop', 'autostart-on', 'autostart-off'):
+        return False, 'Unsupported action'
+    try:
+        result = subprocess.run([WG_HELPER, action], capture_output=True, text=True, timeout=18)
+        response = json.loads(result.stdout)
+        return result.returncode == 0 and response.get('ok') is True, response.get('message') or 'WireGuard action failed'
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        return False, 'WireGuard helper unavailable or timed out'
+
 STORE_FILE, STORE_BTN = Path('/etc/s9/store_mode'), (30, 1160, 1050, 1330)
 WIRELESS_BTN = (30, 985, 1050, 1125)
 def net_box(i):
@@ -606,11 +633,13 @@ def page_overview(data, stale=False, cores=False):
         up = (services.get(key) or {}).get('up')
         if key == 'tailscale':
             up = ts_state(services.get(key) or {}) == ('Connected', True)
+        if key == 'wireguard':
+            _, up = wg_state(services.get(key) or {})
         color = GREEN if up is True else AMBER if up is False else MUTED
-        x = 60 + i * 245
-        card(x, 1430, 225, 100, fill=BG, outline=color)
-        text(x + 52, 1480, NET_ICONS[key], 34, color, anchor='mm', icon=True)
-        text(x + 145, 1480, {'tailscale': 'Tail', 'bluetooth': 'BT'}.get(key, label.split()[0]), 28, color, bold=True, anchor='mm', max_width=150)
+        x, y, right, bottom = ov_service_box(i)
+        card(x, y, right - x, bottom - y, fill=BG, outline=color)
+        text(x + 36, 1480, NET_ICONS[key], 32, color, anchor='mm', icon=True)
+        text(x + 116, 1480, {'tailscale': 'Tail', 'wireguard': 'WG', 'bluetooth': 'BT'}.get(key, label.split()[0]), 28, color, bold=True, anchor='mm', max_width=100)
 
     items = containers_of(data)
     run = sum(i.get('state') == 'running' for i in items)
@@ -706,6 +735,15 @@ def net_detail(key, data):
         return 'Tailscale', [('State', label), ('Tailnet IP', ts.get('ip') or '—'), ('Hostname', ts.get('name') or '—'),
                              ('Peers online', f"{ts.get('online', 0)} of {ts.get('peers', 0)}" if ts else '—')], \
             'Log in once: sudo tailscale up' if ts.get('state') == 'NeedsLogin' else ''
+    if key == 'wireguard':
+        wg = svc.get('wireguard') or {}
+        state, _ = wg_state(wg)
+        handshake = wg.get('latest_handshake')
+        age = f'{max(0, int(time.time() - handshake))} s ago' if isinstance(handshake, (int, float)) and handshake > 0 else 'Never / unknown'
+        return 'WireGuard', [('State', state), ('Profile', wg.get('profile') or '—'),
+                             ('Service', wg.get('service') or '—'), ('Peers', str(wg.get('peers')) if wg.get('peers') is not None else '—'),
+                             ('Latest handshake', age), ('Autostart', 'On' if wg.get('autostart') is True else 'Off' if wg.get('autostart') is False else 'Unknown')], \
+            'Configure /etc/s9/wireguard and the VPN profile as root.' if not wg.get('configured') else 'Up = interface active. Check handshake for peer connectivity.'
     if key == 'usb':
         return 'USB', [('Link', sysfs('/sys/class/net/ncm0/operstate')), ('Gadget', sysfs(next(Path('/sys/class/udc').glob('*/state'), '/nonexistent'))), ('Phone IP', '172.16.43.1'), ('Host IP', '172.16.43.2 (DHCP)'),
             ('Serial', '/dev/ttyGS0')], 'Network + serial gadget. Set up at boot by usb-net'
@@ -714,7 +752,7 @@ def net_detail(key, data):
     return 'Web dashboard', [('Status', onoff), ('Wi-Fi', f"http://{ip}:8090"), ('Tailnet', 'port 8090')], ''
 
 
-def page_netsub(key, data, stale):
+def page_netsub(key, data, stale, busy=False, toast=None):
     image = Image.new('RGB', IMG, BG)
     d, text, card, bar = tools(image)
     header(image, '', stale, right=' ')
@@ -726,6 +764,13 @@ def page_netsub(key, data, stale):
         text(60, 215 + i * 100, k, 34, MUTED)
         text(1020, 210 + i * 100, v, 42, anchor='ra', max_width=620)
     text(60, 240 + len(rows) * 100, hint, 30, MUTED, max_width=960)
+    if key == 'wireguard':
+        wg = (data.get('services') or {}).get('wireguard') or {}
+        enabled = wg.get('configured') is True and not stale and not busy
+        btn(text, card, WG_START, 'Start', GREEN if enabled else MUTED, 44)
+        btn(text, card, WG_STOP, 'Stop', AMBER if enabled else MUTED, 44)
+        btn(text, card, WG_AUTO, 'Autostart: ' + ('On' if wg.get('autostart') else 'Off'), CYAN if enabled else MUTED, 42)
+        text(540, 1330, toast or '', 32, AMBER, anchor='mm', max_width=960)
     return image
 
 
@@ -752,12 +797,14 @@ def page_network(data, stale):
         state = 'Unknown' if up is None else state
         if key == 'tailscale':
             state, up = ts_state(services.get(key) or {})
+        if key == 'wireguard':
+            state, up = wg_state(services.get(key) or {})
         color = GREEN if up is True else AMBER if up is False else MUTED
         text(85, y + 67, NET_ICONS[key], 48, color, anchor='mm', icon=True)
         text(140, y + 35, label, 52, bold=True, max_width=600)
         text(980, y + 35, state, 48, color, bold=True, anchor='ra')
         text(1030, y + 33, '›', 52, MUTED, anchor='ra')
-    text(40, 1650, f"Dashboard: {DASH_URL.replace('127.0.0.1', (wifi.get('ip_address') or 'phone').split('/')[0])}", 34, MUTED, max_width=1000)
+    text(40, 1810, f"Dashboard: {DASH_URL.replace('127.0.0.1', (wifi.get('ip_address') or 'phone').split('/')[0])}", 34, MUTED, max_width=1000)
     return image
 
 
@@ -2045,7 +2092,7 @@ PICK_TOP, PICK_H, PICK_MAX = 160, 150, 12
 BT_POWER, BT_VIS, BT_NAME, BT_FIELD = (30, 150, 1050, 290), (30, 310, 1050, 450), (30, 470, 1050, 610), (30, 200, 1050, 350)
 WEB_BOXES = [(30, 150 + i * 180, 1050, 305 + i * 180) for i in range(4)]
 FORM_TOAST_Y = {'rename': 1040, 'pw': 1040, 'ip': 1040, 'ssh': 1040, 'info': 1340, 'btname': 1040, 'bt': 820, 'web': 1090, 'usb': 1000, 'audio': 1400}
-FORM_SUBS = ('wifi', 'ssh', 'bluetooth', 'web', 'usb', 'audio')
+FORM_SUBS = ('wifi', 'ssh', 'bluetooth', 'web', 'usb', 'audio', 'wireguard')
 AUDIO_BOXES = [(30, 150, 1050, 305), (30, 325, 1050, 480), (30, 500, 1050, 720), (30, 740, 1050, 895), (30, 915, 1050, 1135)]
 AUDIO_TEST = (30, 1160, 1050, 1280)
 AUDIO_SLIDER = (60, 1020)    # x span of the full-width bars; a tap anywhere in the row sets the value there
@@ -2572,7 +2619,10 @@ class Ui:
                 elif hit(OV_CPU, x, y):
                     self.ov_cores = not self.ov_cores
                 elif hit(OV_NET, x, y):
+                    wg_box = ov_service_box(2)
                     self.go(2)
+                    if hit(wg_box, x, y):
+                        self.open_sub('wireguard', data)
                 elif hit(OV_DOCK, x, y):
                     self.go(DOCK_PAGE)
                 elif hit(OV_PROC, x, y):
@@ -2732,6 +2782,8 @@ class Ui:
             self.w = {'view': 'audio', 'audio': audio_state()}
         elif key == 'usb':
             self.w = {'view': 'usb', 'usb': usb_state()}
+        elif key == 'wireguard':
+            self.w = {'view': 'wireguard'}
         elif key == 'ssh':
             self.w = {'view': 'ssh', 'field': 'pw', 'pw': '', 'show': False, 'user': login_user()}
 
@@ -2757,13 +2809,24 @@ class Ui:
                 w['view'] = 'bt'
             elif v == 'rename':
                 w['view'] = 'ssh'
-            elif v in ('info', 'ssh', 'bt', 'web', 'usb', 'audio'):
+            elif v in ('info', 'ssh', 'bt', 'web', 'usb', 'audio', 'wireguard'):
                 self.sub = self.w = None
             else:
                 w['view'] = 'info'
                 if v == 'saved':
                     self.run(wifi_info, (), lambda r: w.update(info=r))
             return True
+        if v == 'wireguard':
+            wg = (data.get('services') or {}).get('wireguard') or {}
+            # Actions use only the trusted root config, never a name from dashboard JSON.
+            if self.busy or w.get('stale') or wg.get('configured') is not True:
+                return False
+            action = ('start' if hit(WG_START, x, y) else 'stop' if hit(WG_STOP, x, y) else
+                      ('autostart-off' if wg.get('autostart') else 'autostart-on') if hit(WG_AUTO, x, y) else None)
+            if action:
+                self.run(wg_action, (action,), self.after, 'Applying WireGuard…', secs=20)
+                return True
+            return False
         if v == 'usb':
             for box, (key, _, _) in zip(USB_BOXES, USB_MODES):
                 if hit(box, x, y) and w['usb']['mode'] != key:
@@ -2942,6 +3005,9 @@ class Ui:
             image = page_guard(stale, self.toast and self.toast[0])
         elif self.page == 3 and self.perf:
             image = page_perf(data, stale, self.toast and self.toast[0], time.monotonic() < self.trip_until)
+        elif self.page == 2 and self.sub == 'wireguard':
+            self.w['stale'] = stale
+            image = page_netsub('wireguard', data, stale, self.busy, self.toast and self.toast[0])
         elif self.page == 2 and self.sub in FORM_SUBS:
             image = page_form(self.w, self.toast and self.toast[0], self.kb_mode, self.ctrl, self.pressed, data)
         elif self.page == 2 and self.sub:
@@ -3147,6 +3213,7 @@ def sample_data():
                     'governor': 'simple_ondemand', 'temp_c': 31},
             'wifi': {'connected': True, 'ssid': 'home', 'ip_address': '192.168.1.21', 'signal_percent': 80, 'rate_mbps': '300 Mbps'},
             'services': {'ssh': {'up': True}, 'bluetooth': {'up': False}, 'usb': {'up': True},
+                         'wireguard': {'configured': False, 'up': None, 'state': 'Unconfigured'},
                          'tailscale': {'up': False, 'state': 'NeedsLogin', 'ip': None, 'name': 's9', 'peers': 0, 'online': 0}}}
 
 
@@ -3379,8 +3446,15 @@ def selftest():
         boxes = [b for _, b in kb_keys(mode)]
         assert len(boxes) == 7 + 10 + sum(len(r) for r in KB_ROWS[mode]) + 2 + 3 and max(b[3] for b in boxes) <= TAB_Y, mode
     assert stale.go(TERM_PAGE) is None and stale.render({}, False, 0).size == IMG    # no pyte/no session: hint page
-    assert term_size(False, True) == (80, 42) and term_size(False, False) == (80, 73)
-    assert term_size(True, True) == (150, 20) and term_size(True, False) == (150, 37)
+    # Glyph advances depend on the installed font and raster scale. The grid must
+    # fit the viewport and leave less than one unused cell, not match a fixed count.
+    cw = term_cell_width()
+    for rotated, keyboard, width, rows in (
+            (False, True, W - 2 * TERM_X, 42), (False, False, W - 2 * TERM_X, 73),
+            (True, True, TAB_Y - TERM_TOP - 2 * TERM_X, 20),
+            (True, False, TAB_Y - TERM_TOP - 2 * TERM_X, 37)):
+        cols, actual_rows = term_size(rotated, keyboard)
+        assert cols * cw <= width < (cols + 1) * cw and actual_rows == rows
     qbox = next(box for key, box in kb_keys('abc') if key == 'q')
     qx, qy = (qbox[0] + qbox[2]) // 2, (qbox[1] + qbox[3]) // 2
     qrot = (rotated_kb_height() - (qy - (KB_TOP - 6)) * rotated_kb_height() / kb_height(),
@@ -3716,7 +3790,7 @@ def selftest():
     BT_CONF, WEB_CONF = old
     ui = Ui()
     ui.go(2)
-    ui.on_gesture(('tap', 100, net_box(3)[1] + 20), data, 0)
+    ui.on_gesture(('tap', 100, net_box([k for k, _ in NET_ROWS].index('bluetooth'))[1] + 20), data, 0)
     assert ui.sub == 'bluetooth' and ui.job[0] is bt_state
     ui.job = None; ui.busy = False
     ui.w['bt'] = {'on': True, 'vis': False, 'alias': 'S9', 'addr': 'AA:BB'}
@@ -3733,7 +3807,7 @@ def selftest():
     assert ui.w['view'] == 'bt'
     ui.on_gesture(('tap', 100, 60), data, 0)
     assert ui.sub is None
-    ui.on_gesture(('tap', 100, net_box(4)[1] + 20), data, 0)
+    ui.on_gesture(('tap', 100, net_box([k for k, _ in NET_ROWS].index('web'))[1] + 20), data, 0)
     assert ui.sub == 'web' and ui.render(data, False, 0).size == IMG
     ui.on_gesture(('tap', 500, 250), data, 0)
     assert ui.job and ui.busy

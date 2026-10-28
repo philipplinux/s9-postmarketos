@@ -28,6 +28,9 @@ i 755 bootlogo/s9-bootlogo.initd /etc/init.d/s9-bootlogo
 i 755 docker/schedtune-off /etc/init.d/schedtune-off
 i 755 docker/s9-srv.initd /etc/init.d/s9-srv
 i 440 tailscale/sudoers /etc/sudoers.d/s9-tailscale
+i 755 wireguard/s9-wireguard /usr/local/sbin/s9-wireguard
+i 440 wireguard/sudoers /etc/sudoers.d/s9-wireguard
+i 644 wireguard/config.example /usr/share/s9-server/wireguard.conf.example
 i 644 docker/daemon.json /etc/docker/daemon.json
 i 755 usbnet/usb-net /usr/local/sbin/usb-net
 i 755 usbnet/usb-net.start /etc/local.d/usb-net.start

@@ -1,0 +1,2 @@
+# Read-only status for the dashboard UID. No start/stop or arbitrary arguments.
+#10000 ALL=(root) NOPASSWD: /usr/local/sbin/s9-wireguard status
